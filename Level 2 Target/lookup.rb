@@ -18,27 +18,29 @@ domain = get_command_line_argument
 # https://www.rubydoc.info/stdlib/core/IO:readlines
 dns_raw = File.readlines("zone")
 
-def parse_dns(dns)
-  single_rec = ""
-  dns_records = {}
-  dns.each do |line|
-    single_rec = line.split(", ").map { |word| word.strip }
-    if single_rec[0] == "A" or single_rec[0] == "CNAME"
-      dns_records[single_rec[1].to_sym] = {
-        :type => single_rec[0],
-        :destination => single_rec[2],
-      }
-    end
+def parse_dns(raw)
+  raw.reject { |line|
+    line.empty?
+  }.map { |line|
+    line.strip.split(", ")
+  }.reject do |record|
+    record[0] != "A" && record[0] != "CNAME"
   end
-  dns_records
+    .each_with_object({}) do |record, records|
+    records[record[1].to_sym] = {
+      :type => record[0],
+      :destination => record[2],
+    }
+  end
 end
 
 def resolve(dns_records, lookup_chain, domain)
-  if dns_records[domain.to_sym] != nil
-    lookup_chain.push(dns_records[domain.to_sym][:destination])
+  user_domain = domain.to_sym
+  if dns_records[user_domain] != nil
+    lookup_chain.push(dns_records[user_domain][:destination])
 
-    if dns_records[domain.to_sym][:type] == "CNAME"
-      resolve(dns_records, lookup_chain, dns_records[domain.to_sym][:destination])
+    if dns_records[user_domain][:type] == "CNAME"
+      resolve(dns_records, lookup_chain, dns_records[user_domain][:destination])
     end
   else
     lookup_chain = ["Error: record not found for #{domain}"]
